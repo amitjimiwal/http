@@ -26,7 +26,7 @@ func main() {
 
 	defer connection.Close();
 
-	_,errs :=connection.Write([]byte("HTTP/1.1 200 Ok\r\n\r\n"));
+	_,errs :=connection.Write([]byte("HTTP/1.1 200 OK\r\n\r\n"));
 	if errs!=nil{
 		fmt.Println("Error in sending response back",err);
 	}
