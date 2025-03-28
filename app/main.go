@@ -18,9 +18,16 @@ func main() {
 		fmt.Println("Failed to bind to port 4221");
 		os.Exit(1);
 	}
-	_,err=l.Accept()
+	connection,err:=l.Accept()
 	if err!=nil{
 		fmt.Println("Error accepting connection: ",err.Error());
 		os.Exit(1);
+	}
+
+	defer connection.Close();
+
+	_,errs :=connection.Write([]byte("HTTP/1.1 200 Ok\r\n\r\n"));
+	if errs!=nil{
+		fmt.Println("Error in sending response back",err);
 	}
 }
