@@ -44,7 +44,7 @@ func main() {
 	}
 	//extra check for extracting the str from /echo/{str}
 	if !strings.HasPrefix(request_target, "/echo/") {
-		fmt.Println("The requested resource is not present")
+		fmt.Println("HTTP/1.1 404 Not Found\r\n\r\n")
 		os.Exit(1)
 	}
 	//extract value from request target
