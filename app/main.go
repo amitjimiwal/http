@@ -25,7 +25,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	defer connection.Close()
+	defer connection.Close() //closing the connection after main functions exits with success, error or panic , anything
 
 	//store the incoming request in bytes
 	bytes := make([]byte, 1024)
