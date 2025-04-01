@@ -29,25 +29,25 @@ func main() {
 
 	//store the incoming request in bytes
 	bytes := make([]byte, 1024)
-	n, errr := connection.Read(bytes)
+	_, errr := connection.Read(bytes)
 	if errr != nil {
 		fmt.Println("Error Reading request", errr)
 		os.Exit(1)
 	}
+	request_target := getRequestTarget(string(bytes))
 
-	msg := string(bytes[:n]) //convert the bytes to a string slice
-	parts := strings.Split(msg, " ")
-	request_target := parts[1]
-	if len(parts) == 0 {
-		fmt.Println("Error in retrieving the request target from the request")
-		os.Exit(1)
+	if request_target == "/" {
+		connection.Write([]byte("HTTP/1.1 200 OK\r\n\r\n"))
+	} else if strings.HasPrefix(request_target, "/echo") {
+		val := strings.Split(request_target, "/")[2]
+		connection.Write([]byte(fmt.Sprintf("HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: %d\r\n\r\n%s", len(val), val)))
+	} else {
+		connection.Write([]byte("HTTP/1.1 404 Not Found\r\n\r\n"))
 	}
-	//extra check for extracting the str from /echo/{str}
-	if !strings.HasPrefix(request_target, "/echo/") {
-		fmt.Println("HTTP/1.1 404 Not Found\r\n\r\n")
-		os.Exit(1)
-	}
-	//extract value from request target
-	value := strings.Split(request_target, "/")[2];
-	connection.Write([]byte(fmt.Sprintf("HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: %d\r\n\r\n%s", len(value), value)))
+}
+
+func getRequestTarget(request string) string {
+	statusLine := strings.Split(request, "\r\n")[0]
+	req_tar := strings.Split(statusLine, " ")[1]
+	return req_tar
 }
