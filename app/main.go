@@ -60,7 +60,7 @@ func getUserAgent(req string) string {
 	for _, v := range headers {
 		if strings.HasPrefix(v, "User-Agent") {
 			agent_value := v[11:]
-			return agent_value
+			return strings.TrimSpace(agent_value)
 		}
 	}
 	return ""
