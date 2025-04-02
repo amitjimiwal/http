@@ -19,12 +19,18 @@ func main() {
 		fmt.Println("Failed to bind to port 4221")
 		os.Exit(1)
 	}
-	connection, err := l.Accept()
-	if err != nil {
-		fmt.Println("Error accepting connection: ", err.Error())
-		os.Exit(1)
+
+	for {
+		connection, err := l.Accept()
+		if err != nil {
+			fmt.Println("Error accepting connection: ", err.Error())
+			os.Exit(1)
+		}
+		go handleReq(connection) //goroutine
 	}
 
+}
+func handleReq(connection net.Conn) {
 	defer connection.Close() //closing the connection after main functions exits with success, error or panic , anything
 
 	//store the incoming request in bytes
@@ -48,7 +54,6 @@ func main() {
 		connection.Write([]byte("HTTP/1.1 404 Not Found\r\n\r\n"))
 	}
 }
-
 func getRequestTarget(request string) string {
 	statusLine := strings.Split(request, "\r\n")[0]
 	req_tar := strings.Split(statusLine, " ")[1]
