@@ -41,6 +41,9 @@ func main() {
 	} else if strings.HasPrefix(request_target, "/echo") {
 		val := strings.Split(request_target, "/")[2]
 		connection.Write([]byte(fmt.Sprintf("HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: %d\r\n\r\n%s", len(val), val)))
+	} else if request_target == "/user-agent" {
+		res := getUserAgent(string(bytes))
+		connection.Write([]byte(fmt.Sprintf("HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: %d\r\n\r\n%s", len(res), res)))
 	} else {
 		connection.Write([]byte("HTTP/1.1 404 Not Found\r\n\r\n"))
 	}
@@ -50,4 +53,15 @@ func getRequestTarget(request string) string {
 	statusLine := strings.Split(request, "\r\n")[0]
 	req_tar := strings.Split(statusLine, " ")[1]
 	return req_tar
+}
+
+func getUserAgent(req string) string {
+	headers := strings.Split(req, "\r\n")[1:]
+	for _, v := range headers {
+		if strings.HasPrefix(v, "User-Agent") {
+			agent_value := v[11:]
+			return agent_value
+		}
+	}
+	return ""
 }
