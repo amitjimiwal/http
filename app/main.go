@@ -56,7 +56,7 @@ func handleReq(connection net.Conn) {
 		dir := os.Args[2];
 		file_name := fmt.Sprintf("%s.txt", strings.Split(request_target, "/")[2])
 		//search the filename in /tmp directory
-		fmt.Println(file_name)
+		// fmt.Println(file_name)
 		file_content, err := os.ReadFile(dir + file_name);
 		if err != nil {
 			connection.Write([]byte("HTTP/1.1 404 Not Found\r\n\r\n"))
