@@ -19,13 +19,15 @@ func main() {
 		fmt.Println("Failed to bind to port 4221")
 		os.Exit(1)
 	}
-
+	counter := 1
 	for {
 		connection, err := l.Accept()
 		if err != nil {
 			fmt.Println("Error accepting connection: ", err.Error())
 			os.Exit(1)
 		}
+		fmt.Printf("Request No %d \n", counter)
+		counter++
 		go handleReq(connection) //goroutine
 	}
 
@@ -50,6 +52,30 @@ func handleReq(connection net.Conn) {
 	} else if request_target == "/user-agent" {
 		res := getUserAgent(string(bytes))
 		connection.Write([]byte(fmt.Sprintf("HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: %d\r\n\r\n%s", len(res), res)))
+	} else if strings.HasPrefix(request_target, "/files/") {
+		file_name := fmt.Sprintf("%s.txt", strings.Split(request_target, "/")[2])
+		//search the filename in /tmp directory
+		fmt.Println(file_name)
+		files, err := os.ReadDir("./tmp")
+		if err != nil {
+			fmt.Println("Error in opening dir", err)
+			os.Exit(1)
+		}
+		for _, f := range files {
+			if !f.IsDir() && f.Name() == file_name {
+				//extract contents of that file
+				file_content, err := os.ReadFile("./tmp/" + file_name)
+				if err != nil {
+					fmt.Println("Error in getting the file content", err)
+					os.Exit(1)
+				}
+				fmt.Println("Content", file_content) //gives byte array
+				connection.Write([]byte(fmt.Sprintf("HTTP/1.1 200 OK\r\nContent-Type: application/octet-stream\r\nContent-Length: %d\r\n\r\n%s", len(file_content), string(file_content))))
+				break
+			}
+		}
+		//respond error if there's no file
+		connection.Write([]byte("HTTP/1.1 404 Not Found\r\n\r\n"))
 	} else {
 		connection.Write([]byte("HTTP/1.1 404 Not Found\r\n\r\n"))
 	}
