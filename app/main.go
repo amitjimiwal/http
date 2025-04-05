@@ -50,11 +50,14 @@ func handleReq(connection net.Conn) {
 	} else if strings.HasPrefix(request_target, "/echo") {
 		val := strings.Split(request_target, "/")[2]
 		encoding_format := getContentEncodingScheme(string(bytes))
-		if encoding_format == "gzip" {
-			connection.Write([]byte(fmt.Sprintf("HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: %d\r\nContent-Encoding: %s\r\n\r\n%s", len(val), encoding_format, val)))
-		} else {
-			connection.Write([]byte(fmt.Sprintf("HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: %d\r\n\r\n%s", len(val), val)))
+		client_encodings := strings.Split(encoding_format, ",")
+		for _, algo := range client_encodings {
+			if strings.TrimSpace(algo) == "gzip" {
+				connection.Write([]byte(fmt.Sprintf("HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: %d\r\nContent-Encoding: %s\r\n\r\n%s", len(val), algo, val)))
+			}
 		}
+		connection.Write([]byte(fmt.Sprintf("HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: %d\r\n\r\n%s", len(val), val)))
+
 	} else if request_target == "/user-agent" {
 		res := getUserAgent(string(bytes))
 		connection.Write([]byte(fmt.Sprintf("HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: %d\r\n\r\n%s", len(res), res)))
