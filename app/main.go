@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net"
 	"os"
+	"strconv"
 	"strings"
 )
 
@@ -42,7 +43,7 @@ func handleReq(connection net.Conn) {
 		fmt.Println("Error Reading request", errr)
 		os.Exit(1)
 	}
-	request_target := getRequestTarget(string(bytes))
+	request_target, statusLine, body := getRequestTargetStatusLine(string(bytes))
 
 	if request_target == "/" {
 		connection.Write([]byte("HTTP/1.1 200 OK\r\n\r\n"))
@@ -56,20 +57,43 @@ func handleReq(connection net.Conn) {
 		dir := os.Args[2]
 		file_name := strings.Split(request_target, "/")[2]
 		fmt.Println(dir + file_name)
-		file_content, err := os.ReadFile(dir + file_name)
-		if err != nil {
-			fmt.Println("Error in reding file: ", err)
-			connection.Write([]byte("HTTP/1.1 404 Not Found\r\n\r\n"))
+
+		var method string = strings.Split(statusLine, " ")[0]
+		if method == "GET" {
+			file_content, err := os.ReadFile(dir + file_name)
+			if err != nil {
+				fmt.Println("Error in reding file: ", err)
+				connection.Write([]byte("HTTP/1.1 404 Not Found\r\n\r\n"))
+			}
+			connection.Write([]byte(fmt.Sprintf("HTTP/1.1 200 OK\r\nContent-Type: application/octet-stream\r\nContent-Length: %d\r\n\r\n%s", len(file_content), string(file_content))))
+		} else if method == "POST" {
+			file, err := os.OpenFile(dir+file_name, os.O_WRONLY|os.O_CREATE, 0644)
+			if err != nil {
+				fmt.Println("error in opening file: ", err)
+				os.Exit(1)
+			}
+			defer file.Close()
+			length := getContentLength(string(bytes))
+			fmt.Println("Before body: ", body)
+			body := body[:length]
+			fmt.Println("Body: ", body)
+			_, err = file.WriteString(body)
+			if err != nil {
+				fmt.Println("Error in writing to the file: ", err)
+				os.Exit(1)
+			}
+			connection.Write([]byte("HTTP/1.1 201 Created\r\n\r\n"))
 		}
-		connection.Write([]byte(fmt.Sprintf("HTTP/1.1 200 OK\r\nContent-Type: application/octet-stream\r\nContent-Length: %d\r\n\r\n%s", len(file_content), string(file_content))))
 	} else {
 		connection.Write([]byte("HTTP/1.1 404 Not Found\r\n\r\n"))
 	}
 }
-func getRequestTarget(request string) string {
+func getRequestTargetStatusLine(request string) (string, string, string) {
 	statusLine := strings.Split(request, "\r\n")[0]
 	req_tar := strings.Split(statusLine, " ")[1]
-	return req_tar
+	body := strings.Split(request, "\r\n\r\n")[1]
+	fmt.Println(body)
+	return req_tar, statusLine, body
 }
 
 func getUserAgent(req string) string {
@@ -81,4 +105,19 @@ func getUserAgent(req string) string {
 		}
 	}
 	return ""
+}
+func getContentLength(req string) int {
+	headers := strings.Split(req, "\r\n")[1:]
+	for _, v := range headers {
+		if strings.HasPrefix(v, "Content-Length") {
+			agent_value := v[16:]
+			num, err := strconv.Atoi(agent_value)
+			if err != nil {
+				fmt.Println("Conversion error:", err)
+				return 0
+			}
+			return num
+		}
+	}
+	return 0
 }
