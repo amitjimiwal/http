@@ -1,6 +1,8 @@
 package main
 
 import (
+	"bytes"
+	"compress/gzip"
 	"fmt"
 	"net"
 	"os"
@@ -51,9 +53,14 @@ func handleReq(connection net.Conn) {
 		val := strings.Split(request_target, "/")[2]
 		encoding_format := getContentEncodingScheme(string(bytes))
 		client_encodings := strings.Split(encoding_format, ",")
+		fmt.Println(client_encodings);
 		for _, algo := range client_encodings {
 			if strings.TrimSpace(algo) == "gzip" {
-				connection.Write([]byte(fmt.Sprintf("HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: %d\r\nContent-Encoding: %s\r\n\r\n%s", len(val), algo, val)))
+				compressed_data, err := compressData([]byte(val))
+				if err != nil {
+					break
+				}
+				connection.Write([]byte(fmt.Sprintf("HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: %d\r\nContent-Encoding: %s\r\n\r\n%s", len(compressed_data), algo, compressed_data)))
 			}
 		}
 		connection.Write([]byte(fmt.Sprintf("HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: %d\r\n\r\n%s", len(val), val)))
@@ -139,4 +146,15 @@ func getContentEncodingScheme(req string) string {
 		}
 	}
 	return ""
+}
+
+func compressData(d []byte) (string, error) {
+	var buf bytes.Buffer
+	writer := gzip.NewWriter(&buf)
+	_, err := writer.Write(d)
+	if err != nil {
+		return "", err
+	}
+	writer.Close();
+	return buf.String(), nil
 }
