@@ -53,12 +53,12 @@ func handleReq(connection net.Conn) {
 		res := getUserAgent(string(bytes))
 		connection.Write([]byte(fmt.Sprintf("HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: %d\r\n\r\n%s", len(res), res)))
 	} else if strings.HasPrefix(request_target, "/files/") {
-		dir := os.Args[2];
-		file_name := fmt.Sprintf("%s.txt", strings.Split(request_target, "/")[2])
-		//search the filename in /tmp directory
-		// fmt.Println(file_name)
-		file_content, err := os.ReadFile(dir + file_name);
+		dir := os.Args[2]
+		file_name := strings.Split(request_target, "/")[2]
+		fmt.Println(dir + file_name)
+		file_content, err := os.ReadFile(dir + file_name)
 		if err != nil {
+			fmt.Println("Error in reding file: ", err)
 			connection.Write([]byte("HTTP/1.1 404 Not Found\r\n\r\n"))
 		}
 		connection.Write([]byte(fmt.Sprintf("HTTP/1.1 200 OK\r\nContent-Type: application/octet-stream\r\nContent-Length: %d\r\n\r\n%s", len(file_content), string(file_content))))
