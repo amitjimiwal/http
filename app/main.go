@@ -1,5 +1,4 @@
 package main
-
 import (
 	"bytes"
 	"compress/gzip"
@@ -9,17 +8,19 @@ import (
 	"strconv"
 	"strings"
 )
-
-// Ensures gofmt doesn't remove the "net" and "os" imports above (feel free to remove this!)
-var _ = net.Listen
-var _ = os.Exit
+type Request struct {
+	status_line    string
+	headers        map[string]string
+	body           string
+	request_target string
+}
 
 func main() {
 	// You can use print statements as follows for debugging, they'll be visible when running tests.
 	fmt.Println("Logs from your program will appear here!")
-	l, err := net.Listen("tcp", "0.0.0.0:4221")
+	l, err := net.Listen("tcp", "0.0.0.0:4000")
 	if err != nil {
-		fmt.Println("Failed to bind to port 4221")
+		fmt.Println("Failed to bind to port 4000", err.Error())
 		os.Exit(1)
 	}
 	counter := 1
@@ -37,7 +38,6 @@ func main() {
 }
 func handleReq(connection net.Conn) {
 	defer connection.Close() //closing the connection after main functions exits with success, error or panic , anything
-
 	//store the incoming request in bytes
 	bytes := make([]byte, 1024)
 	_, errr := connection.Read(bytes)
@@ -45,15 +45,14 @@ func handleReq(connection net.Conn) {
 		fmt.Println("Error Reading request", errr)
 		os.Exit(1)
 	}
-	request_target, statusLine, body := getRequestTargetStatusLine(string(bytes))
-
-	if request_target == "/" {
+	request_schema := extractRequestComponent(string(bytes))
+	if request_schema.request_target == "/" {
 		connection.Write([]byte("HTTP/1.1 200 OK\r\n\r\n"))
-	} else if strings.HasPrefix(request_target, "/echo") {
-		val := strings.Split(request_target, "/")[2]
-		encoding_format := getContentEncodingScheme(string(bytes))
+	} else if strings.HasPrefix(request_schema.request_target, "/echo") {
+		val := strings.Split(request_schema.request_target, "/")[2]
+		encoding_format := getContentEncodingScheme(request_schema.headers)
 		client_encodings := strings.Split(encoding_format, ",")
-		fmt.Println(client_encodings);
+		fmt.Println(client_encodings)
 		for _, algo := range client_encodings {
 			if strings.TrimSpace(algo) == "gzip" {
 				compressed_data, err := compressData([]byte(val))
@@ -65,15 +64,15 @@ func handleReq(connection net.Conn) {
 		}
 		connection.Write([]byte(fmt.Sprintf("HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: %d\r\n\r\n%s", len(val), val)))
 
-	} else if request_target == "/user-agent" {
-		res := getUserAgent(string(bytes))
+	} else if request_schema.request_target == "/user-agent" {
+		res := getUserAgent(request_schema.headers)
 		connection.Write([]byte(fmt.Sprintf("HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: %d\r\n\r\n%s", len(res), res)))
-	} else if strings.HasPrefix(request_target, "/files/") {
+	} else if strings.HasPrefix(request_schema.request_target, "/files/") {
 		dir := os.Args[2]
-		file_name := strings.Split(request_target, "/")[2]
+		file_name := strings.Split(request_schema.request_target, "/")[2]
 		fmt.Println(dir + file_name)
 
-		var method string = strings.Split(statusLine, " ")[0]
+		var method string = strings.Split(request_schema.status_line, " ")[0]
 		if method == "GET" {
 			file_content, err := os.ReadFile(dir + file_name)
 			if err != nil {
@@ -88,9 +87,9 @@ func handleReq(connection net.Conn) {
 				os.Exit(1)
 			}
 			defer file.Close()
-			length := getContentLength(string(bytes))
-			fmt.Println("Before body: ", body)
-			body := body[:length]
+			length := getContentLength(request_schema.headers)
+			fmt.Println("Before body: ", request_schema.body)
+			body := request_schema.body[:length]
 			fmt.Println("Body: ", body)
 			_, err = file.WriteString(body)
 			if err != nil {
@@ -103,16 +102,29 @@ func handleReq(connection net.Conn) {
 		connection.Write([]byte("HTTP/1.1 404 Not Found\r\n\r\n"))
 	}
 }
-func getRequestTargetStatusLine(request string) (string, string, string) {
-	statusLine := strings.Split(request, "\r\n")[0]
-	req_tar := strings.Split(statusLine, " ")[1]
+func extractRequestComponent(request string) Request {
+	status_line := strings.Split(request, "\r\n")[0]
+	request_target := strings.Split(status_line, " ")[1]
 	body := strings.Split(request, "\r\n\r\n")[1]
-	fmt.Println(body)
-	return req_tar, statusLine, body
+	header_payload := strings.Split(request, "\r\n")[1:]
+	header_payload = header_payload[:len(header_payload)-1]
+	headers := make(map[string]string)
+	for _, v := range header_payload {
+		if strings.Contains(v, ":") {
+			header := strings.Split(v, ": ")
+			headers[header[0]] = header[1]
+		}
+	}
+	req_tar := Request{
+		status_line:    status_line,
+		headers:        headers,
+		body:           body,
+		request_target: request_target,
+	}
+	return req_tar
 }
 
-func getUserAgent(req string) string {
-	headers := strings.Split(req, "\r\n")[1:]
+func getUserAgent(headers map[string]string) string {
 	for _, v := range headers {
 		if strings.HasPrefix(v, "User-Agent") {
 			agent_value := v[11:]
@@ -121,8 +133,7 @@ func getUserAgent(req string) string {
 	}
 	return ""
 }
-func getContentLength(req string) int {
-	headers := strings.Split(req, "\r\n")[1:]
+func getContentLength(headers map[string]string) int {
 	for _, v := range headers {
 		if strings.HasPrefix(v, "Content-Length") {
 			agent_value := v[16:]
@@ -137,8 +148,7 @@ func getContentLength(req string) int {
 	return 0
 }
 
-func getContentEncodingScheme(req string) string {
-	headers := strings.Split(req, "\r\n")[1:]
+func getContentEncodingScheme(headers map[string]string) string {
 	for _, v := range headers {
 		if strings.HasPrefix(v, "Accept-Encoding") {
 			agent_value := v[17:]
@@ -155,6 +165,6 @@ func compressData(d []byte) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	writer.Close();
+	writer.Close()
 	return buf.String(), nil
 }
