@@ -1,4 +1,5 @@
 package main
+
 import (
 	"bytes"
 	"compress/gzip"
@@ -8,6 +9,7 @@ import (
 	"strconv"
 	"strings"
 )
+
 type Request struct {
 	status_line    string
 	headers        map[string]string
@@ -125,37 +127,28 @@ func extractRequestComponent(request string) Request {
 }
 
 func getUserAgent(headers map[string]string) string {
-	for _, v := range headers {
-		if strings.HasPrefix(v, "User-Agent") {
-			agent_value := v[11:]
-			return strings.TrimSpace(agent_value)
-		}
+	if val, ok := headers["User-Agent"]; ok {
+		return strings.TrimSpace(val)
 	}
 	return ""
 }
 func getContentLength(headers map[string]string) int {
-	for _, v := range headers {
-		if strings.HasPrefix(v, "Content-Length") {
-			agent_value := v[16:]
-			num, err := strconv.Atoi(agent_value)
-			if err != nil {
-				fmt.Println("Conversion error:", err)
-				return 0
-			}
-			return num
+	if val, ok := headers["Content-Length"]; ok {
+		length, err := strconv.Atoi(val)
+		if err != nil {
+			fmt.Println("Error in converting content length to int: ", err)
+			return 0
 		}
+		return length
 	}
 	return 0
 }
 
 func getContentEncodingScheme(headers map[string]string) string {
-	for _, v := range headers {
-		if strings.HasPrefix(v, "Accept-Encoding") {
-			agent_value := v[17:]
-			return agent_value
-		}
+	if val, ok := headers["Accept-Encoding"]; ok {
+		return strings.TrimSpace(val)
 	}
-	return ""
+	return "";
 }
 
 func compressData(d []byte) (string, error) {
